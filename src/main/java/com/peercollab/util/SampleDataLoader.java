@@ -9,7 +9,8 @@ import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.*;
+import java.util.Date;
+import java.util.Optional;
 
 @Component
 public class SampleDataLoader implements CommandLineRunner {
@@ -33,116 +34,169 @@ public class SampleDataLoader implements CommandLineRunner {
     private PasswordEncoder passwordEncoder;
 
     @Override
-    public void run(String... args) {
+    public void run(String... args) throws Exception {
 
-        System.out.println("🚀 Running SampleDataLoader...");
+        System.out.println("Checking and fixing user passwords...");
 
-        // 🔹 CREATE TEACHER ONLY IF NOT EXISTS
-        User teacher = userRepository.findByUsername("teacher")
-                .orElseGet(() -> {
-                    User t = new User();
-                    t.setUsername("teacher");
-                    t.setPassword(passwordEncoder.encode("password"));
-                    t.setRole("ROLE_TEACHER");
-                    t.setFullName("Teacher User");
-                    t.setEmail("teacher@peercollab.edu");
-                    return userRepository.save(t);
-                });
+        // 5. Ensure no plain-text passwords exist in DB:
+        // Remove or overwrite any incorrect entries
+        for (User user : userRepository.findAll()) {
+            if (!user.getPassword().startsWith("$2a$")
+                    && !user.getPassword().startsWith("$2b$")
+                    && !user.getPassword().startsWith("$2y$")) {
 
-        // 🔹 CREATE STUDENTS ONLY IF NOT EXISTS
-        User student1 = userRepository.findByUsername("student1")
-                .orElseGet(() -> {
-                    User s = new User();
-                    s.setUsername("student1");
-                    s.setPassword(passwordEncoder.encode("password"));
-                    s.setRole("ROLE_STUDENT");
-                    s.setFullName("Alice Smith");
-                    s.setEmail("alice@student.edu");
-                    return userRepository.save(s);
-                });
+                System.out.println("Encoding plain-text password for user: " + user.getUsername());
+                user.setPassword(passwordEncoder.encode(user.getPassword()));
+                userRepository.save(user);
+            }
+        }
 
-        User student2 = userRepository.findByUsername("student2")
-                .orElseGet(() -> {
-                    User s = new User();
-                    s.setUsername("student2");
-                    s.setPassword(passwordEncoder.encode("password"));
-                    s.setRole("ROLE_STUDENT");
-                    s.setFullName("Bob Jones");
-                    s.setEmail("bob@student.edu");
-                    return userRepository.save(s);
-                });
+        // Reinsert or overwrite teacher user with encoded password
+        Optional<User> teacherOpt = userRepository.findByUsername("teacher");
+        User teacher;
 
-        // 🔹 ONLY LOAD PROJECT DATA IF EMPTY
+        if (teacherOpt.isPresent()) {
+            teacher = teacherOpt.get();
+        } else {
+            teacher = new User();
+        }
+
+        teacher.setUsername("teacher");
+        teacher.setPassword(passwordEncoder.encode("password"));
+        teacher.setRole("ROLE_TEACHER");
+        teacher.setFullName("Teacher User");
+        teacher.setEmail("teacher@peercollab.edu");
+
+        userRepository.save(teacher);
+
         if (projectRepository.count() == 0) {
+            System.out.println("Loading sample data...");
 
-            System.out.println("📦 Loading sample project data...");
+            // Create Users (teacher created above safely)
+            User student1 = new User();
+            student1.setUsername("student1");
+            student1.setPassword(passwordEncoder.encode("password"));
+            student1.setRole("ROLE_STUDENT");
+            student1.setFullName("Alice Smith");
+            student1.setEmail("alice@student.edu");
 
-            // Project
+            User student2 = new User();
+            student2.setUsername("student2");
+            student2.setPassword(passwordEncoder.encode("password"));
+            student2.setRole("ROLE_STUDENT");
+            student2.setFullName("Bob Jones");
+            student2.setEmail("bob@student.edu");
+
+            userRepository.save(teacher);
+            userRepository.save(student1);
+            userRepository.save(student2);
+
+            // Create Project
             Project project = new Project();
             project.setTitle("Final React Project");
             project.setDescription("Build a fully responsive React application.");
             project.setDeadline(Date.from(Instant.now().plus(7, ChronoUnit.DAYS)));
             project.setCreatedBy(teacher);
+
             projectRepository.save(project);
 
-            // Rubrics
-            Rubric r1 = new Rubric(null, project, "UI/UX Design", 10);
-            Rubric r2 = new Rubric(null, project, "Code Quality", 10);
-            Rubric r3 = new Rubric(null, project, "Functionality", 15);
+            // Create Rubrics
+            Rubric r1 = new Rubric();
+            r1.setProject(project);
+            r1.setCriteria("UI/UX Design");
+            r1.setMaxScore(10);
 
-            rubricRepository.saveAll(Arrays.asList(r1, r2, r3));
+            Rubric r2 = new Rubric();
+            r2.setProject(project);
+            r2.setCriteria("Code Quality");
+            r2.setMaxScore(10);
 
-            // Submissions
+            Rubric r3 = new Rubric();
+            r3.setProject(project);
+            r3.setCriteria("Functionality");
+            r3.setMaxScore(15);
+
+            rubricRepository.save(r1);
+            rubricRepository.save(r2);
+            rubricRepository.save(r3);
+
+            // Create Submissions
             Submission sub1 = new Submission();
             sub1.setProject(project);
             sub1.setStudent(student1);
-            sub1.setContent("Here is my final project.");
+            sub1.setContent("Here is my final project containing all requirements.");
             sub1.setFileUrl("https://github.com/alicesmith/react-final");
             sub1.setSubmittedAt(new Date());
 
             Submission sub2 = new Submission();
             sub2.setProject(project);
             sub2.setStudent(student2);
-            sub2.setContent("My submission.");
+            sub2.setContent("My submission for the React final project.");
             sub2.setFileUrl("https://github.com/bobjones/react-final");
             sub2.setSubmittedAt(new Date());
 
-            submissionRepository.saveAll(Arrays.asList(sub1, sub2));
+            submissionRepository.save(sub1);
+            submissionRepository.save(sub2);
 
-            // Feedback 1
+            // Create Feedback
             Feedback fb1 = new Feedback();
             fb1.setSubmission(sub1);
             fb1.setReviewer(student2);
-            fb1.setComments("Great work!");
+            fb1.setComments("Great project, very well designed. Some minor issues in code structure.");
             fb1.setTotalScore(30);
+            fb1.setRubricScores(new java.util.ArrayList<>());
             fb1.setCreatedAt(new Date());
-            fb1.setRubricScores(new ArrayList<>());
 
-            // Feedback scores
-            FeedbackRubricScore s1 = new FeedbackRubricScore(null, fb1, r1, 9);
-            FeedbackRubricScore s2 = new FeedbackRubricScore(null, fb1, r2, 6);
-            FeedbackRubricScore s3 = new FeedbackRubricScore(null, fb1, r3, 15);
+            FeedbackRubricScore s1 = new FeedbackRubricScore();
+            s1.setFeedback(fb1);
+            s1.setRubric(r1);
+            s1.setScore(9);
 
-            fb1.getRubricScores().addAll(Arrays.asList(s1, s2, s3));
+            FeedbackRubricScore s2 = new FeedbackRubricScore();
+            s2.setFeedback(fb1);
+            s2.setRubric(r2);
+            s2.setScore(6);
 
-            // Feedback 2
+            FeedbackRubricScore s3 = new FeedbackRubricScore();
+            s3.setFeedback(fb1);
+            s3.setRubric(r3);
+            s3.setScore(15);
+
+            fb1.getRubricScores().add(s1);
+            fb1.getRubricScores().add(s2);
+            fb1.getRubricScores().add(s3);
+
             Feedback fb2 = new Feedback();
             fb2.setSubmission(sub2);
             fb2.setReviewer(student1);
-            fb2.setComments("Needs UI improvement.");
+            fb2.setComments("Good functionality but the UI needs a lot of work.");
             fb2.setTotalScore(22);
+            fb2.setRubricScores(new java.util.ArrayList<>());
             fb2.setCreatedAt(new Date());
-            fb2.setRubricScores(new ArrayList<>());
 
-            FeedbackRubricScore s4 = new FeedbackRubricScore(null, fb2, r1, 5);
-            FeedbackRubricScore s5 = new FeedbackRubricScore(null, fb2, r2, 7);
-            FeedbackRubricScore s6 = new FeedbackRubricScore(null, fb2, r3, 10);
+            FeedbackRubricScore s4 = new FeedbackRubricScore();
+            s4.setFeedback(fb2);
+            s4.setRubric(r1);
+            s4.setScore(5);
 
-            fb2.getRubricScores().addAll(Arrays.asList(s4, s5, s6));
+            FeedbackRubricScore s5 = new FeedbackRubricScore();
+            s5.setFeedback(fb2);
+            s5.setRubric(r2);
+            s5.setScore(7);
 
-            feedbackRepository.saveAll(Arrays.asList(fb1, fb2));
+            FeedbackRubricScore s6 = new FeedbackRubricScore();
+            s6.setFeedback(fb2);
+            s6.setRubric(r3);
+            s6.setScore(10);
 
-            System.out.println("✅ Sample data loaded successfully");
+            fb2.getRubricScores().add(s4);
+            fb2.getRubricScores().add(s5);
+            fb2.getRubricScores().add(s6);
+
+            feedbackRepository.save(fb1);
+            feedbackRepository.save(fb2);
+
+            System.out.println("Sample data loaded.");
         }
     }
 }
