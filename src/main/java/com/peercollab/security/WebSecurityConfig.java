@@ -15,7 +15,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.security.config.Customizer;  // ← ADD THIS IMPORT
+import org.springframework.security.config.Customizer;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
@@ -75,12 +75,15 @@ public class WebSecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-            .cors(Customizer.withDefaults())  // ← THIS IS THE CORRECT LINE
+            .cors(Customizer.withDefaults())
             .csrf(csrf -> csrf.disable())
             .exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler))
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> 
-                auth.requestMatchers("/api/auth/**").permitAll()
+                auth
+                    .requestMatchers("/api/auth/**").permitAll()
+                    .requestMatchers("/api/projects/**").permitAll()  // ← TEMP: Allow projects
+                    .requestMatchers("/api/submissions/**").permitAll()  // ← TEMP: Allow submissions
                     .anyRequest().authenticated()
             );
 
