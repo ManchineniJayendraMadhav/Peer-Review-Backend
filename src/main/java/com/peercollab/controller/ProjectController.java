@@ -14,7 +14,7 @@ import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Optional;
 
-@CrossOrigin(origins = "*", maxAge = 3600)
+@CrossOrigin(origins = "https://peer-review-frontend-three.vercel.app", maxAge = 3600)
 @RestController
 @RequestMapping("/api/projects")
 public class ProjectController {
@@ -26,8 +26,12 @@ public class ProjectController {
     UserRepository userRepository;
 
     @GetMapping
+    // TEMPORARILY REMOVED @PreAuthorize FOR TESTING - ADD BACK LATER
     public List<Project> getAllProjects() {
-        return projectRepository.findAll();
+        System.out.println("=== GET /api/projects called ===");
+        List<Project> projects = projectRepository.findAll();
+        System.out.println("Found " + projects.size() + " projects");
+        return projects;
     }
 
     @GetMapping("/{id}")
@@ -60,7 +64,6 @@ public class ProjectController {
             project.setDescription(projectDetails.getDescription());
             project.setDeadline(projectDetails.getDeadline());
             
-            // update rubrics
             if (projectDetails.getRubrics() != null) {
                 project.getRubrics().clear();
                 projectDetails.getRubrics().forEach(r -> {
