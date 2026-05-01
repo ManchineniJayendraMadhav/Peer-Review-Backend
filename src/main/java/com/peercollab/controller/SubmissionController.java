@@ -10,13 +10,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import org.springframework.security.access.prepost.PreAuthorize;
 import jakarta.validation.Valid;
 
 import java.util.List;
 import java.util.Optional;
 
-@CrossOrigin(origins = "*", maxAge = 3600)
+@CrossOrigin(origins = "https://peer-review-frontend-three.vercel.app", maxAge = 3600)
 @RestController
 @RequestMapping("/api/submissions")
 public class SubmissionController {
@@ -31,18 +30,14 @@ public class SubmissionController {
     UserRepository userRepository;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('TEACHER', 'STUDENT')")
-    public List<Submission> getAllSubmissions(@RequestParam(required = false) Long projectId, @RequestParam(required = false) Long studentId) {
-        if (projectId != null) {
-            return submissionRepository.findByProjectId(projectId);
-        } else if (studentId != null) {
-            return submissionRepository.findByStudentId(studentId);
-        }
-        return submissionRepository.findAll();
+    public List<Submission> getAllSubmissions() {
+        System.out.println("=== GET /api/submissions called ===");
+        List<Submission> submissions = submissionRepository.findAll();
+        System.out.println("Found " + submissions.size() + " submissions");
+        return submissions;
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('TEACHER', 'STUDENT')")
     public ResponseEntity<Submission> getSubmissionById(@PathVariable Long id) {
         return submissionRepository.findById(id)
                 .map(ResponseEntity::ok)
@@ -50,7 +45,6 @@ public class SubmissionController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<?> createSubmission(@Valid @RequestBody Submission submission) {
         if (submission.getProject() == null || submission.getProject().getId() == null ||
             submission.getStudent() == null || submission.getStudent().getId() == null) {
